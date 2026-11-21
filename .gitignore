@@ -1,0 +1,38 @@
+
+# Python virtual environment
+venv/
+env/
+.venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Environment secrets
+.env
+.env.*
+!.env.example
+
+# Local databases
+db.sqlite3
+*.sqlite3
+
+# User uploads and generated files
+media/
+private_media/
+staticfiles/
+
+# Frontend dependencies
+node_modules/
+dist/
+
+# Installer files
+*.exe
+*.msi
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
