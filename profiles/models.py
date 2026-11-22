@@ -4,6 +4,8 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 
+from accounts.storage import private_storage
+
 MIN_AGE = 18
 
 
@@ -66,7 +68,7 @@ class Profile(models.Model):
 
 class ProfilePhoto(models.Model):
     profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="photos")
-    image = models.ImageField(upload_to="profile_photos/%Y/%m/")
+    image = models.ImageField(storage=private_storage, upload_to="profile_photos/%Y/%m/")
     position = models.PositiveSmallIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 

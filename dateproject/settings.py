@@ -118,7 +118,7 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
     "DEFAULT_THROTTLE_CLASSES": ["rest_framework.throttling.AnonRateThrottle"],
-    "DEFAULT_THROTTLE_RATES": {"anon": "60/min", "email_resend": "5/hour"},
+    "DEFAULT_THROTTLE_RATES": {"anon": "60/min", "email_resend": "5/hour", "chat": "120/min"},
 }
 
 # Anti-scraping: max Guess Your Vibe sessions a student can start per 24 hours

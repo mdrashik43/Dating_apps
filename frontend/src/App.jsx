@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { api, tokenStore } from "./api";
+import { useEffect, useRef, useState } from "react";
+import { api, fetchBlob, tokenStore } from "./api";
 
 const Err = ({ e }) => (e ? <p className="err" role="alert">{e}</p> : null);
 
@@ -60,12 +60,23 @@ function Auth({ onAuth }) {
   );
 }
 
+function AuthImage({ url, alt }) {
+  const [src, setSrc] = useState(null);
+  useEffect(() => {
+    let u;
+    fetchBlob(url).then((x) => { u = x; setSrc(x); }).catch(() => {});
+    return () => u && URL.revokeObjectURL(u);
+  }, [url]);
+  return src ? <img src={src} alt={alt} style={{ width: "100%", maxHeight: 300, objectFit: "cover", borderRadius: 16 }} /> : null;
+}
+
 function ProfileCard({ p }) {
   return (
-    <div className="card">
+    <div className="card" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {p.photos?.map((ph) => <AuthImage key={ph.id} url={ph.url} alt={`Photo of ${p.display_name}`} />)}
       <h2>{p.display_name}, {p.age}</h2>
-      <p className="muted">{[p.department, p.batch].filter(Boolean).join(" · ")}</p>
-      {p.bio && <p>{p.bio}</p>}
+      <p className="muted" style={{ margin: 0 }}>{[p.department, p.batch].filter(Boolean).join(" · ")}</p>
+      {p.bio && <p style={{ margin: 0 }}>{p.bio}</p>}
     </div>
   );
 }
@@ -176,24 +187,152 @@ function Play({ goProfile }) {
   );
 }
 
+function ChatRoom({ conv, onBack }) {
+  const [msgs, setMsgs] = useState([]);
+  const [text, setText] = useState("");
+  const last = useRef(0);
+  const end = useRef(null);
+  const { busy, err, run } = useAction();
+  const merge = (add) => setMsgs((m) => {
+    const seen = new Set(m.map((x) => x.id));
+    const next = [...m, ...add.filter((x) => !seen.has(x.id))];
+    last.current = next.at(-1)?.id || 0;
+    return next;
+  });
+  const poll = () => api(`/chat/conversations/${conv.id}/messages/${last.current ? `?after=${last.current}` : ""}`).then(merge).catch(() => {});
+  useEffect(() => { poll(); const t = setInterval(poll, 4000); return () => clearInterval(t); }, []);
+  useEffect(() => { end.current?.scrollIntoView({ block: "end" }); }, [msgs]);
+  const send = (e) => {
+    e.preventDefault();
+    run(async () => { merge([await api(`/chat/conversations/${conv.id}/messages/`, { method: "POST", body: { body: text } })]); setText(""); });
+  };
+  return (
+    <main style={{ paddingBottom: 12 }}>
+      <div className="row" style={{ alignItems: "center" }}>
+        <button className="btn link" style={{ flex: "0 0 auto" }} onClick={onBack}>Back</button>
+        <h2>{conv.profile.display_name}</h2>
+      </div>
+      <div className="msgs">
+        {msgs.length === 0 && <p className="muted center">Say hello.</p>}
+        {msgs.map((m) => <div key={m.id} className={`bubble ${m.mine ? "mine" : ""}`}>{m.body}</div>)}
+        <div ref={end} />
+      </div>
+      <Err e={err} />
+      <form onSubmit={send} className="row">
+        <input className="input" required maxLength={2000} value={text} onChange={(e) => setText(e.target.value)} placeholder="Write a message" aria-label="Message" />
+        <button className="btn" style={{ flex: "0 0 auto" }} disabled={busy}>Send</button>
+      </form>
+    </main>
+  );
+}
+
 function Matches() {
   const [list, setList] = useState(null);
+  const [chat, setChat] = useState(null);
   const { err, run } = useAction();
-  const load = () => run(async () => setList(await api("/matches/")));
-  useEffect(() => { load(); }, []);
+  const load = () => run(async () => setList(await api("/chat/conversations/")));
+  useEffect(() => { load(); }, [chat]);
   const unmatch = (id) => run(async () => { await api(`/matches/${id}/unmatch/`, { method: "POST" }); load(); });
+  if (chat) return <ChatRoom conv={chat} onBack={() => setChat(null)} />;
   return (
     <main>
       <h2>Matches</h2>
       <Err e={err} />
       {list && list.length === 0 && <p className="muted">No matches yet. Play Guess Your Vibe to meet someone.</p>}
-      {list?.map((m) => (
-        <div key={m.id}>
-          <ProfileCard p={m.profile} />
-          <button className="btn link" onClick={() => unmatch(m.id)}>Unmatch</button>
+      {list?.map((c) => (
+        <div key={c.id}>
+          <ProfileCard p={c.profile} />
+          {c.last_message && <p className="muted" style={{ margin: "8px 0 0" }}>{c.last_message.mine ? "You: " : ""}{c.last_message.body}</p>}
+          <div className="row">
+            <button className="btn" onClick={() => setChat(c)}>Message{c.unread ? ` (${c.unread} new)` : ""}</button>
+            <button className="btn link" onClick={() => unmatch(c.match_id)}>Unmatch</button>
+          </div>
         </div>
       ))}
     </main>
+  );
+}
+
+function Alerts({ onRead }) {
+  const [data, setData] = useState(null);
+  const { err, run } = useAction();
+  const load = () => run(async () => { const d = await api("/notifications/"); setData(d); onRead(d.unread); });
+  useEffect(() => { load(); }, []);
+  const markAll = () => run(async () => { await api("/notifications/read/", { method: "POST" }); load(); });
+  return (
+    <main>
+      <h2>Alerts</h2>
+      <Err e={err} />
+      {data && data.items.length === 0 && <p className="muted">Nothing yet.</p>}
+      {data?.items.map((n) => (
+        <div className="card" key={n.id} style={n.is_read ? {} : { borderColor: "#C93A28" }}>
+          <b>{n.title}</b>
+          <p className="muted" style={{ margin: "4px 0 0" }}>{n.body}</p>
+        </div>
+      ))}
+      {data?.unread > 0 && <button className="btn alt" onClick={markAll}>Mark all as read</button>}
+    </main>
+  );
+}
+
+function Photos({ enabled }) {
+  const [list, setList] = useState([]);
+  const { busy, err, run } = useAction();
+  const load = () => api("/profiles/me/photos/").then(setList).catch(() => {});
+  useEffect(() => { load(); }, []);
+  const add = (e) => {
+    const file = e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    const fd = new FormData();
+    fd.append("image", file);
+    run(async () => { await api("/profiles/me/photos/", { method: "POST", body: fd }); load(); });
+  };
+  const del = (id) => run(async () => { await api(`/profiles/me/photos/${id}/`, { method: "DELETE" }); load(); });
+  if (!enabled)
+    return (
+      <section style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <h2>My photos</h2>
+        <p className="muted" style={{ margin: 0 }}>Save your profile above first, then you can add photos.</p>
+      </section>
+    );
+  return (
+    <section style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <h2>My photos</h2>
+      <p className="muted" style={{ margin: 0 }}>Up to 6. Only students you reveal to, or match with, can see them. Location data is removed.</p>
+      {list.map((p) => (
+        <div className="card" key={p.id}>
+          <AuthImage url={p.url} alt="My photo" />
+          <button className="btn link" onClick={() => del(p.id)}>Remove</button>
+        </div>
+      ))}
+      <Err e={err} />
+      <label className="btn alt" style={{ display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+        {busy ? "Uploading..." : "Add a photo"}
+        <input type="file" accept="image/jpeg,image/png,image/webp" onChange={add} hidden />
+      </label>
+    </section>
+  );
+}
+
+function Blocks() {
+  const [list, setList] = useState([]);
+  const { err, run } = useAction();
+  const load = () => api("/moderation/blocks/").then(setList).catch(() => {});
+  useEffect(() => { load(); }, []);
+  const unblock = (id) => run(async () => { await api(`/moderation/blocks/${id}/`, { method: "DELETE" }); load(); });
+  if (list.length === 0) return null;
+  return (
+    <section style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <h2>Blocked students</h2>
+      <Err e={err} />
+      {list.map((b) => (
+        <div className="card" key={b.id}>
+          Blocked on {new Date(b.created_at).toLocaleDateString()}
+          <button className="btn link" onClick={() => unblock(b.id)}>Unblock</button>
+        </div>
+      ))}
+    </section>
   );
 }
 
@@ -248,7 +387,9 @@ function Profile({ user }) {
         {saved && <p className="ok">Saved.</p>}
         <button className="btn" disabled={busy}>Save profile</button>
       </form>
+      <Photos enabled={exists} />
       <Clues />
+      <Blocks />
     </main>
   );
 }
@@ -280,11 +421,20 @@ export default function App() {
   const [ready, setReady] = useState(false);
   const [view, setView] = useState("play");
   const [welcome, setWelcome] = useState(false);
+  const [unread, setUnread] = useState(0);
 
   useEffect(() => {
     if (!tokenStore.get()) return setReady(true);
     api("/auth/me/").then(setUser).catch(() => tokenStore.clear()).finally(() => setReady(true));
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    const check = () => api("/notifications/").then((d) => setUnread(d.unread)).catch(() => {});
+    check();
+    const t = setInterval(check, 30000);
+    return () => clearInterval(t);
+  }, [user]);
 
   if (location.pathname === "/confirm-email") return <div className="app"><ConfirmEmail /></div>;
   if (!ready) return <div className="app"><main className="center muted">Loading...</main></div>;
@@ -300,9 +450,10 @@ export default function App() {
       {welcome && view === "profile" && <p className="ok" style={{ margin: "12px 24px 0" }}>Account created. Check your email to confirm it, then set up your profile.</p>}
       {view === "play" && <Play goProfile={() => setView("profile")} />}
       {view === "matches" && <Matches />}
+      {view === "alerts" && <Alerts onRead={setUnread} />}
       {view === "profile" && <Profile user={user} />}
       <nav aria-label="Main">
-        {[["play", "Play"], ["matches", "Matches"], ["profile", "Profile"]].map(([k, l]) => (
+        {[["play", "Play"], ["matches", "Matches"], ["alerts", unread ? `Alerts (${unread})` : "Alerts"], ["profile", "Profile"]].map(([k, l]) => (
           <button key={k} className={view === k ? "on" : ""} onClick={() => setView(k)}>{l}</button>
         ))}
         <button onClick={logout}>Log out</button>

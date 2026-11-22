@@ -9,4 +9,7 @@ def public_profile(profile) -> dict:
         "bio": profile.bio,
         "department": profile.department,
         "batch": profile.batch,
+        "photos": [
+            {"id": ph.pk, "url": f"/api/profiles/photos/{ph.pk}/"} for ph in profile.photos.all()
+        ],
     }

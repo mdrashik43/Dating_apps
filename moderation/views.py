@@ -58,3 +58,27 @@ class ReportView(APIView):
             details=s.validated_data.get("details", ""),
         )
         return Response({"reported": True}, status=201)
+
+
+class MyBlocksView(APIView):
+    """Deliberately shows no names: otherwise blocking during a game would be a
+    way to learn the mystery student's identity before the reveal."""
+
+    permission_classes = [IsUniversityVerified]
+
+    def get(self, request):
+        from .models import Block
+
+        return Response([{"id": b.pk, "created_at": b.created_at} for b in Block.objects.filter(blocker=request.user).order_by("-created_at")])
+
+
+class UnblockView(APIView):
+    permission_classes = [IsUniversityVerified]
+
+    def delete(self, request, pk):
+        from django.shortcuts import get_object_or_404
+
+        from .models import Block
+
+        get_object_or_404(Block, pk=pk, blocker=request.user).delete()
+        return Response(status=204)

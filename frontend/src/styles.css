@@ -31,3 +31,6 @@ nav { display:flex; border-top:1px solid var(--line); background:#fff; padding:6
 nav button { flex:1; min-height:52px; background:none; border:0; color:var(--muted); font-size:13px; font-weight:600; cursor:pointer; }
 nav button.on { color:var(--accent); }
 .bar { display:flex; gap:6px; } .bar i { flex:1; height:6px; border-radius:3px; background:var(--line); } .bar i.on { background:var(--accent); }
+.msgs { flex:1; min-height:50vh; max-height:60vh; overflow-y:auto; display:flex; flex-direction:column; gap:8px; padding:4px 0; }
+.bubble { max-width:80%; background:#fff; border:1px solid var(--line); border-radius:16px; padding:10px 14px; align-self:flex-start; overflow-wrap:anywhere; }
+.bubble.mine { background:var(--plum); color:#fff; border-color:var(--plum); align-self:flex-end; }

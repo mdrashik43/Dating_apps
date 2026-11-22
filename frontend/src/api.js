@@ -14,12 +14,13 @@ function message(d) {
 
 export async function api(path, { method = "GET", body } = {}) {
   const token = tokenStore.get();
+  const isForm = body instanceof FormData;
   let res;
   try {
     res = await fetch(BASE + path, {
       method,
-      headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Token ${token}` } : {}) },
-      body: body ? JSON.stringify(body) : undefined,
+      headers: { ...(isForm ? {} : { "Content-Type": "application/json" }), ...(token ? { Authorization: `Token ${token}` } : {}) },
+      body: body ? (isForm ? body : JSON.stringify(body)) : undefined,
     });
   } catch {
     throw Object.assign(new Error("Cannot reach the server. Is Django running?"), { status: 0 });
@@ -27,4 +28,11 @@ export async function api(path, { method = "GET", body } = {}) {
   const data = res.status === 204 ? null : await res.json().catch(() => null);
   if (!res.ok) throw Object.assign(new Error(message(data)), { status: res.status });
   return data;
+}
+
+// Photos are private: they need the login token, so <img src> cannot load them directly.
+export async function fetchBlob(path) {
+  const res = await fetch(new URL(BASE).origin + path, { headers: { Authorization: `Token ${tokenStore.get()}` } });
+  if (!res.ok) throw new Error("Photo unavailable");
+  return URL.createObjectURL(await res.blob());
 }

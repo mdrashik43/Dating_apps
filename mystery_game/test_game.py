@@ -124,7 +124,7 @@ class GuessAndRevealTests(APITestCase):
         self.assertEqual(r.status_code, 200)
         p = r.json()["profile"]
         self.assertEqual(p["display_name"], "Zorblax")
-        self.assertEqual(set(p), {"display_name", "age", "gender", "looking_for", "bio", "department", "batch"})
+        self.assertEqual(set(p), {"display_name", "age", "gender", "looking_for", "bio", "department", "batch", "photos"})
         for secret in (self.them.email, str(self.them.pk), "2001-01-15"):
             self.assertNotIn(secret, r.content.decode())
 

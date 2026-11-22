@@ -61,3 +61,31 @@ class ModerationTests(APITestCase):
         self.assertEqual(stranger.post(REPORT, {"session_id": sid, "reason": "fake"}, format="json").status_code, 404)
         self.assertEqual(stranger.post(BLOCK, {"match_id": 999}, format="json").status_code, 404)
         self.assertFalse(Block.objects.exists() or Report.objects.exists())
+
+
+class UnblockTests(APITestCase):
+    def setUp(self):
+        super().setUp()
+        self.me, self.them = self.player("me@uiu.ac.bd", name="Zorblax2"), self.player("t@uiu.ac.bd", name="Secretname")
+        self.c = self.client_for(self.me)
+
+    def test_list_never_reveals_identity(self):
+        sid = self.c.post(S).json()["id"]
+        self.c.post(BLOCK, {"session_id": sid}, format="json")
+        r = self.c.get("/api/moderation/blocks/")
+        self.assertEqual(len(r.json()), 1)
+        self.assertEqual(set(r.json()[0]), {"id", "created_at"})
+        for secret in ("Secretname", self.them.email, str(self.them.pk)):
+            self.assertNotIn(secret, r.content.decode())
+
+    def test_unblock_removes_only_my_block_and_keeps_match_inactive(self):
+        match = mutual_match(self, self.me, self.them)
+        self.c.post(BLOCK, {"match_id": match.pk}, format="json")
+        bid = self.c.get("/api/moderation/blocks/").json()[0]["id"]
+        stranger = self.client_for(self.player("x@uiu.ac.bd"))
+        self.assertEqual(stranger.delete(f"/api/moderation/blocks/{bid}/").status_code, 404)
+        self.assertEqual(self.client_for(self.them).delete(f"/api/moderation/blocks/{bid}/").status_code, 404)
+        self.assertEqual(self.c.delete(f"/api/moderation/blocks/{bid}/").status_code, 204)
+        self.assertFalse(Block.objects.exists())
+        self.assertFalse(Match.objects.get().is_active)
+        self.assertEqual(self.c.get("/api/moderation/blocks/").json(), [])

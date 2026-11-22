@@ -6,6 +6,11 @@ from .models import Profile, ProfilePhoto
 class PhotoInline(admin.TabularInline):
     model = ProfilePhoto
     extra = 0
+    fields = readonly_fields = ["position", "created_at"]  # never render private image widgets
+    can_delete = True
+
+    def has_add_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(Profile)
