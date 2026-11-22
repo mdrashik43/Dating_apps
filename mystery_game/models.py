@@ -25,6 +25,7 @@ class GameSession(models.Model):
     class Status(models.TextChoices):
         ACTIVE = "active", "Active"
         REVEALED = "revealed", "Revealed"
+        DECIDED = "decided", "Decided"
         ABANDONED = "abandoned", "Abandoned"
 
     player = models.ForeignKey(User, on_delete=models.CASCADE, related_name="game_sessions")
@@ -32,10 +33,16 @@ class GameSession(models.Model):
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.ACTIVE)
     started_at = models.DateTimeField(auto_now_add=True)
     revealed_at = models.DateTimeField(null=True, blank=True)
+    clues_unlocked = models.PositiveSmallIntegerField(default=1)
 
     class Meta:
         indexes = [models.Index(fields=["player", "status"])]
         constraints = [
+            models.UniqueConstraint(
+                fields=["player"],
+                condition=Q(status__in=["active", "revealed"]),
+                name="one_open_session_per_player",
+            ),
             models.CheckConstraint(condition=~Q(player=F("mystery_user")), name="no_self_play")
         ]
 

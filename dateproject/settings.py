@@ -121,6 +121,9 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {"anon": "60/min", "email_resend": "5/hour"},
 }
 
+# Anti-scraping: max Guess Your Vibe sessions a student can start per 24 hours
+GAME_DAILY_SESSION_LIMIT = config("GAME_DAILY_SESSION_LIMIT", default=20, cast=int)
+
 # --- Email (console backend in development: links print in the terminal) ------
 EMAIL_BACKEND = config("EMAIL_BACKEND", default="accounts.mail.PlainConsoleEmailBackend")
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="Vibe Match <no-reply@vibematch.local>")

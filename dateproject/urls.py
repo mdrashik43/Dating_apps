@@ -9,4 +9,6 @@ urlpatterns = [
     path("api/auth/", include("accounts.urls")),
     path("api/profiles/", include("profiles.urls")),
     path("api/game/", include("mystery_game.urls")),
+    path("api/matches/", include("matching.urls")),
+    path("api/moderation/", include("moderation.urls")),
 ]

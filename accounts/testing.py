@@ -28,3 +28,24 @@ class APITestCase(TestCase):
 
     def verified_user(self, email="v@uiu.ac.bd"):
         return make_user(email, university=self.uni, is_university_verified=True)
+
+
+def _player(self, email, name=None, clues=3, discoverable=True, consent=True, verified=True):
+    """A student who can play: verified, profile opted in, with clues."""
+    from datetime import date
+
+    from mystery_game.models import Clue
+    from profiles.models import Profile
+
+    u = make_user(email, university=self.uni, is_university_verified=verified)
+    Profile.objects.create(
+        user=u, display_name=name or email.split("@")[0].title(), date_of_birth=date(2001, 1, 15),
+        gender="female", department="CSE", batch="221", bio="Hello there",
+        is_discoverable=discoverable, consent_mystery_game=consent,
+    )
+    for i in range(clues):
+        Clue.objects.create(owner=u, text=f"clue number {i}", position=i)
+    return u
+
+
+APITestCase.player = _player
